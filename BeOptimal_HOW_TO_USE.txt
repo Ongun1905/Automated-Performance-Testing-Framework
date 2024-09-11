@@ -1,0 +1,110 @@
+--------------------------------
+Compilation & Plug-In Activation
+1. Build the entire solution in Visual Studio (this will take ~2-3 hours the first time, much less afterward) - ignore any errors that come up
+2. Go to the Plugin tab in Unreal Engine Editor, make sure the BeOptimal is activated. Restarting the editor might be necessary for the change to take effect.
+
+--------------------------------
+Basic usage:
+- Running tests in editor:
+	- Open the Jordan Project in the UE Editor, go to the toolbar and Select Tools > Session Frontend
+	- In the Session Frontend tab, make sure that your UE Editor instance is selected in the top left "This Application" tab
+	- On the right-hand-side tabs, select "Automation"
+		- Then select Project > Functional Tests > Maps > AT_Performance_Simple
+			- !!! This should be the ONLY automation with a check-mark on the left
+	- You can then click the "play" button in the top-middle, and you should see the test being run
+	- the .CSV created by CSVProfiler will be saved to the Z:\Jordan\Game\Jordan\Saved\Profiling\CSV directory
+		- the save is relative to the project path so if you have a different project path, this will be reflected in the CSV save
+	- Additionaly, a .CSV named "[CSV_PROFILER_CSV]_Output.csv" will be saved to the Z:\Jordan\Game\Jordan\Saved\Profiling\CSV directory
+		- This CSV containts the metrics we are interested in, and also the PASS/FAIL status of the standalone criteria specified in the performance test (0 is FAIL, 1 is PASS)
+
+- Running tests on a cooked build of the game:
+	- First build the entire solution (ignore any errors that come up), then run the cook.bat command (In powershell/cmd so you can see any errors if the cook fails)
+	- Then in Powershell/CMD, you can use the BeOptimal.bat as follows:
+	
+	 BeOptimal [RunTest|ListTests|Compare|GenerateConfig|Database] [..] [..]
+
+		BeOptimal ListTests [MapName]
+		- this will list all tests available in the MapName map
+
+		BeOptimal RunTest [TestName] [MapName] (-ignoreComparisonPass)
+		- this command will run the test name TestName in the MapName map on a client/server build.
+                - after running a test, the server/client raw/post_processed .CSV files will be saved to:
+                	- [Project Directory]/PerfTests/CSV 
+		- add -ignoreComparisonPass flag to force using the latest test for comparison, ignoring whether it passed its comparison or not
+
+		BeOptimal Compare [PathNewClientCSV] [PathOldClientCSV] [PathNewServerCSV] [PathOldServerCSV]
+		- this command will compare two raw client CSV files and output the results.
+		- IMPORTANT: BeOptimal GenerateConfig MUST have ran at least once before this command is called (i.e. you have a Config.ini file in your ConfigDir).
+
+		BeOptimal GenerateConfig
+		- this command will generate a comparison config at ConfigDir (set at top of bat file)
+		- need to be ran before BeOptimal Compare
+		
+		BeOptimal Database [Save|Remove] [..]
+		    - BeOptimal Database Save [PathClientRawCSV] [PathServerRawCSV] [PathClientProcessedCSV] [PathServerProcessedCSV]
+			   - this command will manually save the passed files to the database
+
+		    - BeOptimal Database Remove [TestID]
+		    	   - this command will manually remove the passed testID from the database.
+
+- Changable Values within BeOptimal.bat
+	- At the top of the bat file under "REM Set Default Variables" the following variables can be changed:
+		- ConfigDir : path at which comparison configs are saved
+		- UploadDir : path at which CSVs are saved
+		- BuildDir : path to the staged build of the game
+		- ProjectDir : path to the uproject file of the game
+
+--------------------------------
+Editing test case parameters: 
+- The map we are currently using for testing can be found (In the UE Editor) under All > Content > AutomationTests > Maps > AT_Performance_Simple
+- In the Outliner (top right) you can see an object called "BP_AT_PerformanceTest"
+- Select this object. In the details panel you can see and edit fields under the "Performance Test" tab.
+	- These are the custom fields we added so far
+- !!! The 'Profiling Time' field should always be < the 'Time Limit' field. The test Time Limit should be large enough to allow for the .CSV files created by the CSV profiler and server profiler to be postprocessed.
+	- Setting the Time Limit of the test to be too short can lead to crashes or undefined behaviour, a difference of 5 seconds or more should be enough.
+	- Longer tests require a longer difference between the Profiling time and the Time limit, to allow for postprocessing of the larger test results.
+	- Setting the Time Limit to be longer will ***not*** increase the duration of the test, since the test automatically terminates when postprocessing of results is complete.
+- To change the viewpoint of the static camera, you must change the actor assigned to the "Observation Point" variable in the "Functional Testing" tab.
+
+- Editing Standalone Pass/Fail Criteria:
+	- If no criteria are loaded in (there are 0 elements in the "client criteria" and/or "server criteria" fields:
+		- First select a valid filepath for where you want the template file to be placed
+		- Then create a valid name ending in a ".ini" (!), for example TestFile.ini
+		- Then click on 'Generate Criteria Template File'
+		- You should now see that the "Client Criteria" and "Server Criteria" fields are populated
+
+	- If criteria are loaded, you can edit the condition (the field on the right-hand side of each metric)
+		- Saving the UE level will save the criteria
+		- If you want to save the criteria to the .ini file, use the 'Save Criteria To File' button in the properties panel of the test
+
+	- You can load criteria from an existing file using the 'Load Criteria From File' button
+
+- Adding a Camera Spline
+	- Change the actor assigned to the "Camera Spline" variable in the "Performance Test" tab. 
+		- !!! This action will override the static camera viewpoint set in the "Observation Point" variable in the "Functional Testing" tab
+
+--------------------------------
+Editing Camera Spline parameters:
+- In the Outliner (top right) you can see an object called "BP_AT_CameraSpline"
+- Select this object. In the Details panel you can see and edit fields under the "Performance Test" tab.
+	- These are the custom fields we added so far, you can hover over the fields to get more information.
+- To edit Trigger Points Visualization:
+	- With the "BP_AT_CameraSpline" object selected, click on the "Trigger Vis Component" in the Details panel.
+	- Find the "Bhvr Visualization Component" tab.
+	- Here you can edit the color and radius of the Trigger Points.
+- To preview the movement of the "Observation Camera" in the editor:
+	- Set the variable "Is Spline Active" to true
+	- Play the level. Then, detach from the player controller (F8).
+	- Select the "Observation Camera" actor from the Outliner. This will open a pop-up that shows the Camera's viewpoint.
+
+--------------------------------
+Attaching Actions to Spline Trigger Points:
+- Add Trigger Points (if needed):
+	 - Modify the "Trigger Point Distance" array that can be found in the Details panel of "BP_AT_CameraSpline".
+- Open the Level Blueprint of "AT_Performance_Simple". Observe the existing examples.
+- To add a new Action:
+	- Get a reference to the "BP_AT_CameraSpline" object.
+	- Call the "Add Action to Trigger Point" method of the "BP_AT_CameraSpline" object.
+	- Specify the Trigger that the Action will be attached to (Trigger Index parameter).
+		- Make sure the Trigger Index is within bounds of the "Trigger Point Distance" array.
+	- Specify the Action as a Blueprint Event (Event Func parameter). 
